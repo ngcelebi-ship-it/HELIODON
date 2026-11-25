@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dijital Heliodon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: sakin, öğretici bir stüdyo aracı; maket masasında çalışma hissi
+   IDEA: fiziksel heliodon — döner tabla üstünde beyaz maket, yay üzerinde gezen lamba
+   PICTURE: canlı 3B sahne: maket, gölgeler, güneş yolu yayları ve saat etiketleri
+   COLOUR and TYPE: maket beyazı + gökyüzü zemini, tek keskin vurgu güneş sarısı; Barlow / Barlow Condensed
+   LAYOUT: solda büyük sahne, sağda kontrol paneli; 900px altında sahne üstte, panel altta */
+:root{color-scheme:light dark;
+ --bg:light-dark(#f3f2ef,#14161a);--ink:light-dark(#1c1e22,#ecebe7);--mute:light-dark(#5d6168,#a3a7ae);
+ --panel:light-dark(#ffffff,#1d2025);--line:light-dark(#e3e1dc,#2e3238);--field:light-dark(#f7f6f3,#262a30);
+ --sun:#f5a300;--sunink:light-dark(#8a5200,#ffc24a);--sky1:light-dark(#d5e0ea,#0c0f14);--sky2:light-dark(#eef0ef,#1b1e24)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;padding:16px max(2.5vw,16px) 12px}
+h1{font:600 clamp(26px,3vw,34px)/1.05 "Barlow Condensed",Barlow,sans-serif;margin:0;letter-spacing:.2px}
+header p{margin:0;color:var(--mute);font-size:15px}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:14px;padding:0 max(2.5vw,16px) 18px;align-items:start}
+.stage{position:sticky;top:12px;height:calc(100vh - 92px);min-height:440px;border-radius:14px;overflow:hidden;background:linear-gradient(var(--sky1),var(--sky2) 70%);border:1px solid var(--line)}
+#view{position:absolute;inset:0}#view canvas{display:block;width:100%;height:100%;touch-action:none}
+.views{position:absolute;left:12px;bottom:12px;display:flex;flex-wrap:wrap;gap:6px}
+.views button,.chip{background:color-mix(in srgb,var(--panel) 88%,transparent);backdrop-filter:blur(6px)}
+.night{position:absolute;top:14px;left:50%;transform:translateX(-50%);padding:8px 14px;border-radius:99px;background:var(--panel);font-weight:500;border:1px solid var(--line);display:none;white-space:nowrap}
+.err{position:absolute;inset:0;display:none;place-items:center;padding:24px;text-align:center;color:var(--mute)}
+.panel{display:grid;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.card h2{font:600 18px/1.2 "Barlow Condensed",Barlow,sans-serif;margin:0 0 8px;letter-spacing:.2px}
+.read{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px}
+.big{font:600 clamp(34px,4vw,44px)/1 "Barlow Condensed",sans-serif;color:var(--sunink);white-space:nowrap}
+.big small{font-size:.45em;color:var(--mute);margin-left:4px}
+.lab{font-size:13px;color:var(--mute)}
+dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 12px;margin:10px 0 0;font-size:15px}
+dt{color:var(--mute)}dd{margin:0;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.sub{border-top:1px solid var(--line);margin-top:10px;padding-top:8px}
+.sub b{font-weight:600;font-size:14px}
+label{display:block;font-size:14px;color:var(--mute)}
+.row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+input[type=number],select{width:100%;font:16px Barlow,sans-serif;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:44px;margin-top:3px}
+input[type=range]{width:100%;height:36px;accent-color:var(--sun);margin:0}
+.rl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:6px}
+.rl output{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+button{font:500 15px Barlow,sans-serif;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;min-height:40px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--sun)}button.on{background:var(--sun);border-color:var(--sun);color:#1c1300}
+:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
+.play{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:end;margin-top:6px}
+.play button{min-width:110px}
+.chk{display:flex;align-items:center;gap:8px;min-height:36px;color:var(--ink);font-size:15px}
+.chk input{width:20px;height:20px;accent-color:var(--sun)}
+input[type=file]{font:15px Barlow,sans-serif;width:100%;margin-top:4px;color:var(--mute)}
+.hint{font-size:13px;color:var(--mute);margin:6px 0 0}
+footer{padding:0 max(2.5vw,16px) 22px;font-size:13px;color:var(--mute)}
+@media(max-width:900px){.app{grid-template-columns:minmax(0,1fr)}.stage{position:relative;top:0;height:62vh;min-height:360px}}
+@media(max-width:420px){.row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<header>
+ <h1>Dijital Heliodon</h1>
+ <p>Konum, tarih ve saati seçin; güneşin konumu ve maketin gölgeleri anında güncellenir.</p>
+</header>
+<main class="app">
+ <section class="stage" aria-label="3B heliodon sahnesi">
+  <div id="view"></div>
+  <div class="night" id="night">Güneş ufkun altında</div>
+  <div class="err" id="err">3B kütüphane yüklenemedi. Sayfayı internet bağlantısıyla yeniden açın.</div>
+  <div class="views">
+   <button id="vPersp">Perspektif</button><button id="vTop">Üstten</button><button id="vSun">Güneşten bak</button>
+  </div>
+ </section>
+ <aside class="panel">
+  <div class="card">
+   <div class="read">
+    <div><div class="lab">Güneş yüksekliği</div><div class="big" id="oAlt">–</div></div>
+    <div><div class="lab">Azimut (K'den saat yönü)</div><div class="big" id="oAz">–</div></div>
+   </div>
+   <dl>
+    <dt>Gün doğumu / batımı</dt><dd id="oRise">–</dd>
+    <dt>Gün uzunluğu</dt><dd id="oLen">–</dd>
+    <dt>Güneş öğlesi</dt><dd id="oNoon">–</dd>
+    <dt>Gölge boyu / yükseklik</dt><dd id="oRatio">–</dd>
+    <dt id="oShLab">Bina gölgesi</dt><dd id="oSh">–</dd>
+   </dl>
+   <div class="sub">
+    <b id="oFace">Ön cephe</b>
+    <dl style="margin-top:4px">
+     <dt>Yatay gölge açısı (HSA)</dt><dd id="oHsa">–</dd>
+     <dt>Dikey gölge açısı (VSA)</dt><dd id="oVsa">–</dd>
+     <dt>Pencereyi tam gölgeleyen saçak</dt><dd id="oNeed">–</dd>
+    </dl>
+   </div>
+  </div>
+
+  <div class="card">
+   <h2>Konum</h2>
+   <label>Şehir<select id="city"></select></label>
+   <div class="row" style="margin-top:8px">
+    <label>Enlem (°)<input type="number" id="lat" step="0.01" min="-89" max="89"></label>
+    <label>Boylam (°)<input type="number" id="lon" step="0.01" min="-180" max="180"></label>
+    <label>UTC farkı<input type="number" id="tz" step="0.5" min="-12" max="14"></label>
+   </div>
+  </div>
+
+  <div class="card">
+   <h2>Tarih ve saat</h2>
+   <div class="rl"><label for="doy">Tarih</label><output id="oDate"></output></div>
+   <input type="range" id="doy" min="1" max="365" step="1">
+   <div class="btns">
+    <button data-doy="80">21 Mart</button><button data-doy="172">21 Haziran</button><button data-doy="266">23 Eylül</button><button data-doy="355">21 Aralık</button>
+   </div>
+   <div class="rl" style="margin-top:12px"><label for="min">Yerel saat</label><output id="oTime"></output></div>
+   <input type="range" id="min" min="0" max="1435" step="5">
+   <div class="play">
+    <button id="play">▶ Oynat</button>
+    <label>Hız<select id="speed"><option value="30">30 dk / sn</option><option value="60" selected>1 saat / sn</option><option value="120">2 saat / sn</option></select></label>
+   </div>
+  </div>
+
+  <div class="card">
+   <h2>Örnek kütle</h2>
+   <div class="row">
+    <label>Genişlik (m)<input type="number" id="w" min="2" max="60" step="0.5"></label>
+    <label>Derinlik (m)<input type="number" id="d" min="2" max="60" step="0.5"></label>
+    <label>Yükseklik (m)<input type="number" id="h" min="3" max="90" step="1"></label>
+   </div>
+   <div class="rl"><label for="face">Ön cephe yönü</label><output id="oFaceDir"></output></div>
+   <input type="range" id="face" min="0" max="355" step="5">
+   <div class="rl"><label for="oh">Saçak derinliği</label><output id="oOh"></output></div>
+   <input type="range" id="oh" min="0" max="3" step="0.1">
+   <div class="rl"><label for="fin">Dikey kanat derinliği</label><output id="oFin"></output></div>
+   <input type="range" id="fin" min="0" max="2" step="0.1">
+   <p class="hint">Her katta 3 m yükseklik, ön cephede 1,6 m yüksekliğinde pencere bandı vardır.</p>
+  </div>
+
+  <div class="card">
+   <h2>Kendi modelin</h2>
+   <label>GLB veya OBJ dosyası<input type="file" id="file" accept=".glb,.gltf,.obj"></label>
+   <div class="row2" style="margin-top:6px">
+    <label>Birim<select id="unit"><option value="1">metre</option><option value="0.01">santimetre</option><option value="0.001">milimetre</option></select></label>
+    <label class="chk" style="align-self:end"><input type="checkbox" id="zup"> Z yukarı (Rhino OBJ)</label>
+   </div>
+   <div class="btns"><button id="reset">Örnek kütleye dön</button></div>
+   <p class="hint" id="mInfo">Model, beyaz maket malzemesiyle tablanın ortasına yerleşir. Kuzey −Z yönündedir.</p>
+  </div>
+
+  <div class="card">
+   <h2>Görünüm</h2>
+   <label class="chk"><input type="checkbox" id="showPath" checked> Güneş yolu (seçili gün + gündönümleri)</label>
+   <label class="chk"><input type="checkbox" id="showGrid" checked> 5 m ızgara</label>
+  </div>
+ </aside>
+</main>
+<footer>Güneş konumu NOAA yaklaşık formülleriyle hesaplanır (yaklaşık ±0,5°). Yaz saati uygulanmaz; UTC farkını gerektiğinde elle değiştirin.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/OBJLoader.js"></script>
+<script>
+{
+const $=id=>document.getElementById(id);
+const D2R=Math.PI/180,R2D=180/Math.PI;
+const MONTHS=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+const MDAYS=[31,28,31,30,31,30,31,31,30,31,30,31];
+const DIRS=['K','KD','D','GD','G','GB','B','KB'];
+const CITIES=[['İstanbul',41.01,28.98,3],['Ankara',39.93,32.86,3],['İzmir',38.42,27.14,3],['Antalya',36.89,30.71,3],['Bursa',40.19,29.06,3],['Trabzon',41.00,39.72,3],['Erzurum',39.90,41.27,3],['Diyarbakır',37.91,40.24,3],['Londra',51.51,-0.13,0],['Oslo',59.91,10.75,1],['Dubai',25.20,55.27,4]];
+const f1=v=>v.toLocaleString('tr-TR',{minimumFractionDigits:1,maximumFractionDigits:1});
+const hm=m=>{m=Math.round(((m%1440)+1440)%1440);return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')};
+const dirName=a=>DIRS[Math.round(((a%360)+360)%360/45)%8];
+const dateOf=doy=>{let m=0,d=doy;while(m<11&&d>MDAYS[m]){d-=MDAYS[m];m++}return d+' '+MONTHS[m]};
+const todayDoy=()=>{const n=new Date();let d=n.getDate();for(let i=0;i<n.getMonth();i++)d+=MDAYS[i];return Math.min(d,365)};
+
+/* ---- güneş konumu (NOAA) ---- */
+function sun(lat,lon,tz,doy,min){
+ const g=2*Math.PI/365*(doy-1+(min/60-tz-12)/24);
+ const eq=229.18*(0.000075+0.001868*Math.cos(g)-0.032077*Math.sin(g)-0.014615*Math.cos(2*g)-0.040849*Math.sin(2*g));
+ const dc=0.006918-0.399912*Math.cos(g)+0.070257*Math.sin(g)-0.006758*Math.cos(2*g)+0.000907*Math.sin(2*g)-0.002697*Math.cos(3*g)+0.00148*Math.sin(3*g);
+ const ha=((min+eq+4*lon-60*tz)/4-180)*D2R,la=lat*D2R;
+ const cz=Math.sin(la)*Math.sin(dc)+Math.cos(la)*Math.cos(dc)*Math.cos(ha);
+ const alt=Math.asin(Math.max(-1,Math.min(1,cz)))*R2D;
+ const az=Math.atan2(Math.sin(ha),Math.cos(ha)*Math.sin(la)-Math.tan(dc)*Math.cos(la))*R2D+180;
+ return {alt,az:(az+360)%360,dec:dc*R2D,eq};
+}
+function dayInfo(lat,lon,tz,doy){
+ const s=sun(lat,lon,tz,doy,720),la=lat*D2R,dc=s.dec*D2R;
+ const noon=720-4*lon-s.eq+60*tz;
+ const x=Math.cos(90.833*D2R)/(Math.cos(la)*Math.cos(dc))-Math.tan(la)*Math.tan(dc);
+ if(x>1)return{noon,polar:'night'};if(x<-1)return{noon,polar:'day'};
+ const h=Math.acos(x)*R2D*4;return{noon,rise:noon-h,set:noon+h};
+}
+
+/* ---- durum ---- */
+const DEF={city:0,lat:41.01,lon:28.98,tz:3,doy:todayDoy(),min:600,w:12,d:10,h:9,face:180,oh:0.8,fin:0,path:true,grid:true};
+let st={...DEF};
+try{const s=JSON.parse(localStorage.getItem('heliodon-v1')||'null');if(s)st={...DEF,...s}}catch(e){}
+const save=()=>{try{localStorage.setItem('heliodon-v1',JSON.stringify(st))}catch(e){}};
+
+$('city').innerHTML=CITIES.map((c,i)=>`<option value="${i}">${c[0]}</option>`).join('')+'<option value="-1">Özel konum</option>';
+const fields=['lat','lon','tz','doy','min','w','d','h','face','oh','fin'];
+const syncInputs=()=>{fields.forEach(k=>$(k).value=st[k]);$('city').value=st.city;$('showPath').checked=st.path;$('showGrid').checked=st.grid};
+syncInputs();
+
+if(!window.THREE||!THREE.OrbitControls){$('err').style.display='grid';}else{
+
+/* ---- sahne ---- */
+const view=$('view');
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;
+view.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+const cam=new THREE.PerspectiveCamera(38,1,0.5,1500);
+const ctl=new THREE.OrbitControls(cam,renderer.domElement);
+ctl.enableDamping=true;ctl.maxPolarAngle=Math.PI/2-0.03;ctl.minDistance=8;ctl.maxDistance=400;
+const hemi=new THREE.HemisphereLight(0xdde7f3,0x9a907e,0.45);scene.add(hemi);
+const sunL=new THREE.DirectionalLight(0xfff0d4,1.7);
+sunL.castShadow=true;sunL.shadow.mapSize.set(4096,4096);
+Object.assign(sunL.shadow.camera,{left:-70,right:70,top:70,bottom:-70,near:1,far:400});
+sunL.shadow.bias=-0.0003;sunL.shadow.normalBias=0.04;
+scene.add(sunL,sunL.target);
+
+const R=48;
+const ground=new THREE.Mesh(new THREE.CircleGeometry(R+10,128),new THREE.MeshStandardMaterial({color:0xedeae3,roughness:0.95}));
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+const grid=new THREE.GridHelper(80,16,0xc4beb1,0xd6d1c6);grid.position.y=0.02;scene.add(grid);
+const ring=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([...Array(129)].map((_,i)=>new THREE.Vector3(R*Math.cos(i/128*2*Math.PI),0.04,R*Math.sin(i/128*2*Math.PI)))),new THREE.LineBasicMaterial({color:0x8d877b}));
+scene.add(ring);
+
+function textSprite(txt,h,fg,bg){
+ const c=document.createElement('canvas'),x=c.getContext('2d'),fs=64;
+ x.font=`600 ${fs}px Barlow, system-ui, sans-serif`;const tw=Math.ceil(x.measureText(txt).width)+(bg?40:12);
+ c.width=tw;c.height=fs+24;x.font=`600 ${fs}px Barlow, system-ui, sans-serif`;
+ if(bg){x.fillStyle=bg;const r=c.height/2;x.beginPath();x.moveTo(r,0);x.arcTo(tw,0,tw,c.height,r);x.arcTo(tw,c.height,0,c.height,r);x.arcTo(0,c.height,0,0,r);x.arcTo(0,0,tw,0,r);x.fill()}
+ x.fillStyle=fg;x.textAlign='center';x.textBaseline='middle';x.fillText(txt,tw/2,c.height/2+2);
+ const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;
+ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false}));
+ s.scale.set(h*tw/c.height,h,1);return s;
+}
+[['K',0,-1],['D',1,0],['G',0,1],['B',-1,0]].forEach(([t,x,z])=>{const s=textSprite(t,3.4,t==='K'?'#b4471a':'#3a3d42');s.position.set(x*(R+5),1.8,z*(R+5));scene.add(s)});
+const nArrow=new THREE.Mesh(new THREE.ConeGeometry(1.2,3.2,3),new THREE.MeshBasicMaterial({color:0xb4471a}));
+nArrow.rotation.x=-Math.PI/2;nArrow.position.set(0,0.06,-(R-2.5));nArrow.scale.y=1;scene.add(nArrow);
+
+const dirOf=(alt,az)=>{const a=alt*D2R,z=az*D2R;return new THREE.Vector3(Math.cos(a)*Math.sin(z),Math.sin(a),-Math.cos(a)*Math.cos(z))};
+const sunBall=new THREE.Mesh(new THREE.SphereGeometry(1.7,32,16),new THREE.MeshBasicMaterial({color:0xffb000}));
+scene.add(sunBall);
+
+/* ---- güneş yolu ---- */
+const pathG=new THREE.Group();scene.add(pathG);
+const clearGroup=g=>{while(g.children.length){const o=g.children.pop();o.traverse(n=>{n.geometry&&n.geometry.dispose();if(n.material){n.material.map&&n.material.map.dispose();n.material.dispose()}})}};
+function arcLines(doy,mat){
+ let seg=[];const out=[];
+ for(let m=0;m<=1440;m+=4){const s=sun(st.lat,st.lon,st.tz,doy,m);
+  if(s.alt>=0)seg.push(dirOf(s.alt,s.az).multiplyScalar(R));else if(seg.length){out.push(seg);seg=[]}}
+ if(seg.length)out.push(seg);
+ out.filter(p=>p.length>1).forEach(p=>{const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints(p),mat.clone());l.computeLineDistances();pathG.add(l)});
+}
+function buildPath(){
+ clearGroup(pathG);
+ arcLines(172,new THREE.LineDashedMaterial({color:0xd08a1e,dashSize:1.2,gapSize:0.9}));
+ arcLines(355,new THREE.LineDashedMaterial({color:0x5b7fa6,dashSize:1.2,gapSize:0.9}));
+ arcLines(80,new THREE.LineDashedMaterial({color:0x8d877b,dashSize:0.6,gapSize:0.9}));
+ arcLines(st.doy,new THREE.LineBasicMaterial({color:0xf5a300}));
+ for(let hr=0;hr<24;hr++){const s=sun(st.lat,st.lon,st.tz,st.doy,hr*60);if(s.alt<1.5)continue;
+  const p=dirOf(s.alt,s.az).multiplyScalar(R);
+  const dot=new THREE.Mesh(new THREE.SphereGeometry(0.35,10,8),new THREE.MeshBasicMaterial({color:0xf5a300}));dot.position.copy(p);pathG.add(dot);
+  const t=textSprite(String(hr),1.9,'#2b2d31','rgba(255,255,255,0.88)');t.position.copy(p).add(new THREE.Vector3(0,1.9,0));pathG.add(t)}
+ pathG.visible=st.path;
+}
+
+/* ---- örnek kütle ---- */
+const wallM=new THREE.MeshStandardMaterial({color:0xfbfaf7,roughness:0.85});
+const glassM=new THREE.MeshStandardMaterial({color:0x6d8aa6,roughness:0.35});
+const bldg=new THREE.Group();scene.add(bldg);
+const add=(g,geo,mat,x,y,z)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;g.add(m);return m};
+function buildBox(){
+ clearGroup(bldg);
+ const {w,d,h,oh,fin}=st,floors=Math.max(1,Math.floor(h/3)),ww=w*0.7;
+ add(bldg,new THREE.BoxGeometry(w,h,d),wallM.clone(),0,h/2,0);
+ for(let i=0;i<floors;i++){const y0=i*3;
+  add(bldg,new THREE.BoxGeometry(ww,1.6,0.06),glassM.clone(),0,y0+1.7,d/2+0.03);
+  if(oh>0)add(bldg,new THREE.BoxGeometry(ww+0.6,0.15,oh),wallM.clone(),0,y0+2.68,d/2+oh/2);
+  if(fin>0)[-1,1].forEach(sx=>add(bldg,new THREE.BoxGeometry(0.15,1.9,fin),wallM.clone(),sx*(ww/2+0.075),y0+1.75,d/2+fin/2));
+ }
+ bldg.rotation.y=(180-st.face)*D2R;
+}
+
+/* ---- kullanıcı modeli ---- */
+const modelG=new THREE.Group();scene.add(modelG);let raw=null;
+function placeModel(){
+ if(!raw)return;const k=+$('unit').value;
+ raw.scale.setScalar(k);raw.rotation.set($('zup').checked?-Math.PI/2:0,0,0);raw.position.set(0,0,0);raw.updateMatrixWorld(true);
+ const b=new THREE.Box3().setFromObject(raw),c=b.getCenter(new THREE.Vector3()),sz=b.getSize(new THREE.Vector3());
+ raw.position.set(-c.x,-b.min.y,-c.z);
+ $('mInfo').textContent=`Model boyutu: ${f1(sz.x)} × ${f1(sz.z)} m, yükseklik ${f1(sz.y)} m.`+(Math.max(sz.x,sz.z)>110?' Model tabladan büyük; birimi kontrol edin.':'');
+}
+function useModel(obj){
+ clearGroup(modelG);raw=obj;
+ obj.traverse(n=>{if(n.isMesh){n.material=wallM.clone();n.castShadow=n.receiveShadow=true}});
+ modelG.add(obj);bldg.visible=false;placeModel();update();
+}
+$('file').addEventListener('change',e=>{
+ const f=e.target.files[0];if(!f)return;const ext=f.name.split('.').pop().toLowerCase(),url=URL.createObjectURL(f);
+ const fail=()=>{$('mInfo').textContent='Dosya okunamadı. Tek dosyalık GLB ya da OBJ deneyin.'};
+ $('mInfo').textContent='Yükleniyor…';
+ if(ext==='obj')new THREE.OBJLoader().load(url,useModel,undefined,fail);
+ else new THREE.GLTFLoader().load(url,g=>useModel(g.scene),undefined,fail);
+});
+['unit','zup'].forEach(k=>$(k).addEventListener('change',()=>{placeModel();update()}));
+$('reset').addEventListener('click',()=>{clearGroup(modelG);raw=null;bldg.visible=true;$('file').value='';$('mInfo').textContent='Örnek kütle kullanılıyor.';update()});
+
+/* ---- güncelleme ---- */
+function update(){
+ const s=sun(st.lat,st.lon,st.tz,st.doy,st.min),di=dayInfo(st.lat,st.lon,st.tz,st.doy),up=s.alt>0;
+ const dir=dirOf(s.alt,s.az);
+ sunL.position.copy(dir).multiplyScalar(150);sunL.target.position.set(0,0,0);
+ sunL.intensity=up?1.7*Math.min(1,0.25+s.alt/8):0;hemi.intensity=up?0.45:0.18;
+ sunBall.visible=up&&camMode!=='sun';sunBall.position.copy(dir).multiplyScalar(R);
+ $('night').style.display=up?'none':'block';
+ $('oAlt').innerHTML=f1(s.alt)+'°';
+ $('oAz').innerHTML=f1(s.az)+'°<small>'+dirName(s.az)+'</small>';
+ $('oRise').textContent=di.polar?(di.polar==='day'?'Güneş batmıyor':'Güneş doğmuyor'):hm(di.rise)+' / '+hm(di.set);
+ $('oLen').textContent=di.polar?(di.polar==='day'?'24 sa':'0 sa'):Math.floor((di.set-di.rise)/60)+' sa '+Math.round((di.set-di.rise)%60)+' dk';
+ $('oNoon').textContent=hm(di.noon);
+ const H=raw?new THREE.Box3().setFromObject(raw).getSize(new THREE.Vector3()).y:st.h;
+ $('oRatio').textContent=s.alt>0.5?f1(1/Math.tan(s.alt*D2R)):'–';
+ $('oShLab').textContent='Bina gölgesi (H = '+f1(H)+' m)';
+ $('oSh').textContent=s.alt>0.5?f1(H/Math.tan(s.alt*D2R))+' m → '+dirName(s.az+180):'–';
+ $('oFace').textContent=raw?'Örnek kütle ön cephesi (model yüklü)':'Ön cephe: '+st.face+'° ('+dirName(st.face)+')';
+ let hsa=((s.az-st.face+540)%360)-180;
+ if(!up){['oHsa','oVsa','oNeed'].forEach(k=>$(k).textContent='–')}
+ else if(Math.abs(hsa)>=90){$('oHsa').textContent=f1(hsa)+'°';$('oVsa').textContent='Cephe gölgede';$('oNeed').textContent='Gerekmez'}
+ else{const vsa=Math.atan(Math.tan(s.alt*D2R)/Math.cos(hsa*D2R))*R2D;
+  $('oHsa').textContent=f1(hsa)+'°';$('oVsa').textContent=f1(vsa)+'°';
+  $('oNeed').textContent=vsa>0.5?f1(1.7/Math.tan(vsa*D2R))+' m':'–'}
+ $('oDate').textContent=dateOf(st.doy);$('oTime').textContent=hm(st.min);
+ $('oFaceDir').textContent=st.face+'° ('+dirName(st.face)+')';$('oOh').textContent=f1(st.oh)+' m';$('oFin').textContent=f1(st.fin)+' m';
+ document.querySelectorAll('[data-doy]').forEach(b=>b.classList.toggle('on',+b.dataset.doy===st.doy));
+ grid.visible=st.grid;pathG.visible=st.path;
+ if(camMode==='sun')aimSun();
+ save();
+}
+
+/* ---- girişler ---- */
+const num=(k,v)=>{const el=$(k),lo=+el.min,hi=+el.max;v=+v;if(!isFinite(v))return st[k];return Math.min(hi,Math.max(lo,v))};
+fields.forEach(k=>$(k).addEventListener('input',e=>{
+ if(e.target.value==='')return;st[k]=num(k,e.target.value);
+ if(['lat','lon','tz'].includes(k)){st.city=-1;$('city').value=-1}
+ if(['lat','lon','tz','doy'].includes(k))buildPath();
+ if(['w','d','h','face','oh','fin'].includes(k))buildBox();
+ update();
+}));
+$('city').addEventListener('change',e=>{const i=+e.target.value;st.city=i;if(i>=0){[ ,st.lat,st.lon,st.tz]=CITIES[i];syncInputs()}buildPath();update()});
+document.querySelectorAll('[data-doy]').forEach(b=>b.addEventListener('click',()=>{st.doy=+b.dataset.doy;$('doy').value=st.doy;buildPath();update()}));
+$('showPath').addEventListener('change',e=>{st.path=e.target.checked;update()});
+$('showGrid').addEventListener('change',e=>{st.grid=e.target.checked;update()});
+
+let playing=false,last=0;
+const setPlay=v=>{playing=v;$('play').textContent=v?'❚❚ Durdur':'▶ Oynat';$('play').classList.toggle('on',v);last=performance.now()};
+const stop=()=>setPlay(false);
+$('play').addEventListener('click',()=>setPlay(!playing));
+
+/* ---- kamera ---- */
+let camMode='persp';
+const setMode=m=>{camMode=m;sunBall.visible=m!=='sun'&&sun(st.lat,st.lon,st.tz,st.doy,st.min).alt>0;['vPersp','vTop','vSun'].forEach(id=>$(id).classList.toggle('on',id==='v'+m[0].toUpperCase()+m.slice(1)))};
+function aimSun(){const s=sun(st.lat,st.lon,st.tz,st.doy,st.min);if(s.alt<=1)return;
+ const y=(raw?3:st.h/2);ctl.target.set(0,y,0);cam.position.copy(dirOf(s.alt,s.az).multiplyScalar(140)).add(ctl.target)}
+$('vPersp').addEventListener('click',()=>{setMode('persp');ctl.target.set(0,4,0);cam.position.set(80,62,104)});
+$('vTop').addEventListener('click',()=>{setMode('top');ctl.target.set(0,0,0);cam.position.set(0,170,0.01)});
+$('vSun').addEventListener('click',()=>{setMode('sun');aimSun()});
+ctl.addEventListener('start',()=>{if(camMode!=='persp')setMode('persp')});
+cam.position.set(80,62,104);ctl.target.set(0,4,0);setMode('persp');
+
+const ro=new ResizeObserver(()=>{const w=view.clientWidth,h=view.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()});
+ro.observe(view);
+
+function loop(t){
+ requestAnimationFrame(loop);
+ if(playing){const dt=Math.min(0.1,(t-last)/1000);last=t;
+  const di=dayInfo(st.lat,st.lon,st.tz,st.doy);let m=st.min+dt*+$('speed').value;
+  if(di.polar==='night'){stop()}
+  else if(!di.polar&&m>di.set+20)m=Math.max(0,di.rise-20);
+  st.min=((m%1440)+1440)%1440;$('min').value=Math.round(st.min/5)*5;update()}
+ ctl.update();renderer.render(scene,cam);
+}
+buildPath();buildBox();update();requestAnimationFrame(loop);
+}
+}
+</script>
+</body>
+</html>
